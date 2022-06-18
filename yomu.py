@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 
-# TODO
-# - output current processing step to user
-
 import os
 import sys
 import argparse
