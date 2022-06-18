@@ -86,6 +86,9 @@ def update_dataframe(df, content, content_name, metadata):
     if not df.empty:
         new_df["TIME"] += df["TIME"].iat[-1]
 
+    # Typecast step to int
+    new_df = new_df.astype({"STEP": int})
+
     # Concatenate new dataframe
     df = pd.concat([df, new_df])
 
