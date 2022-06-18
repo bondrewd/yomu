@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 # TODO
-# - parse metadata like time step or integrator and add them to the dataframe
 # - output current processing step to user
 
 import os
@@ -22,6 +21,7 @@ def parse_args():
 
 
 def get_file_content(file):
+    file.seek(0)
     content = []
     for line in file:
         if line.startswith("INFO"):
@@ -31,11 +31,39 @@ def get_file_content(file):
     return content
 
 
-def update_dataframe(df, content, content_name):
+def get_file_metadata(file):
+    file.seek(0)
+    meta = {"dt": np.nan, "ensemble": "", "ff": ""}
+    for line in file:
+        line = line.strip()
+        # Parse timestep line:
+        if line.startswith("timestep"):
+            tokens = line.split()
+            meta["dt"] = float(tokens[2])
+
+        # Parse force field:
+        if line.startswith("forcefield"):
+            tokens = line.split()
+            meta["ff"] = tokens[2]
+
+        # Parse ensemble line:
+        if line.startswith("ensemble"):
+            tokens = line.split()
+            meta["ensemble"] = tokens[2]
+
+    return meta
+
+
+def update_dataframe(df, content, content_name, metadata):
     # Parse header
     header = content[0]
     header = header.split()
-    header = ["NAME"] + header[1:]
+    header = ["NAME", "TIMESTEP", "FORCEFIELD", "ENSEMBLE"] + header[1:]
+
+    # Get metadata
+    dt = metadata["dt"]
+    ff = metadata["ff"]
+    en = metadata["ensemble"]
 
     # Add columns to dataframe
     for item in header:
@@ -48,7 +76,7 @@ def update_dataframe(df, content, content_name):
         line = line.split()
         line = line[1:]
         line = [float(item) for item in line]
-        line = [content_name] + line
+        line = [content_name, dt, ff, en] + line
         data.append(line)
 
     new_df = pd.DataFrame(data, columns=header)
@@ -86,12 +114,13 @@ def main():
 
     for inp, log in zip(inp_name, log_name):
         with open(inp, "r") as file:
-            content = get_file_content(file)
-            df = update_dataframe(df, content, log)
+            cont = get_file_content(file)
+            meta = get_file_metadata(file)
+            df   = update_dataframe(df, cont, log, meta)
 
     # Save dataframe
-    out_name = args.out_name[0]
-    out_path = args.out_path[0]
+    out_name = args.out_name
+    out_path = args.out_path
     out_type = "csv"
 
     os.makedirs(out_path, exist_ok=True)
