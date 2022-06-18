@@ -3,7 +3,6 @@
 # TODO
 # - parse metadata like time step or integrator and add them to the dataframe
 # - output current processing step to user
-# - add option to give names to each file
 
 import os
 import sys
@@ -14,7 +13,10 @@ import pandas as pd
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Merge GENESIS sequence of log files")
-    parser.add_argument("files", metavar="FILE", nargs="+", help="GENESIS log files")
+    parser.add_argument(               dest="inp_name", metavar="FILE", nargs="+",                help="GENESIS log files")
+    parser.add_argument("--out-name",  dest="out_name", metavar="NAME", nargs=1,   default="out", help="Output file name")
+    parser.add_argument("--out-path",  dest="out_path", metavar="PATH", nargs=1,   default="./",  help="Output file path")
+    parser.add_argument("--log-names", dest="log_name", metavar="NAME", nargs="+", default=None,  help="GENESIS log files' name")
 
     return parser.parse_args()
 
@@ -29,11 +31,11 @@ def get_file_content(file):
     return content
 
 
-def update_dataframe(df, content):
+def update_dataframe(df, content, content_name):
     # Parse header
     header = content[0]
     header = header.split()
-    header = header[1:]
+    header = ["NAME"] + header[1:]
 
     # Add columns to dataframe
     for item in header:
@@ -46,6 +48,7 @@ def update_dataframe(df, content):
         line = line.split()
         line = line[1:]
         line = [float(item) for item in line]
+        line = [content_name] + line
         data.append(line)
 
     new_df = pd.DataFrame(data, columns=header)
@@ -68,17 +71,31 @@ def update_dataframe(df, content):
 
 
 def main():
+    # Get file names
     args = parse_args()
-    list = args.files
+    inp_name = args.inp_name
+    log_name = args.log_name
 
+    # Get log dataframe names
+    if not log_name:
+        log_name = [os.path.basename(inp)    for inp in inp_name]
+        log_name = [os.path.splitext(log)[0] for log in log_name]
+
+    # Parse log files into a dataframe
     df = pd.DataFrame()
 
-    for file_name in list:
-        with open(file_name, "r") as file:
+    for inp, log in zip(inp_name, log_name):
+        with open(inp, "r") as file:
             content = get_file_content(file)
-            df = update_dataframe(df, content)
+            df = update_dataframe(df, content, log)
 
-    df.to_csv("out.csv", index=False)
+    # Save dataframe
+    out_name = args.out_name[0]
+    out_path = args.out_path[0]
+    out_type = "csv"
+
+    os.makedirs(out_path, exist_ok=True)
+    df.to_csv(os.path.join(out_path, out_name + "." + out_type), index=False)
 
 
 if __name__ == "__main__":
